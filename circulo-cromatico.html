@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Círculo Cromático HSL — PRO + CMYK Export</title>
+
+  <!-- Bootstrap CSS + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root{ --bg:#f3f6f8; --panel:#243444; --muted:#6c757d; --accent:#0d6efd; --card:#fff }
+    body{ background:var(--bg); font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:#243444 }
+    .app-header{ background:#233041; color:#fff; padding:12px 18px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.08) }
+    .left-panel{ background:var(--panel); color:#fff; padding:18px; min-height:100vh }
+    .panel-card{ background:var(--card); border-radius:10px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06) }
+    .wheel-wrap{ display:flex; justify-content:center; align-items:center; padding:20px; position:relative }
+    canvas#wheel{ border-radius:50%; box-shadow:0 8px 18px rgba(0,0,0,0.12); background:#fff; touch-action:none }
+    .marker{ position:absolute; width:14px; height:14px; border-radius:50%; border:3px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.25); transform:translate(-50%,-50%); pointer-events:none }
+    .swatch{ width:72px; height:48px; border-radius:6px; border:2px solid rgba(0,0,0,0.08); display:inline-block }
+    .small-muted{ color:#b6c2c9; font-size:13px }
+    .color-row{ display:flex; gap:10px; align-items:center; margin-bottom:10px }
+    .color-swatch{ width:44px; height:32px; border-radius:6px; border:1px solid rgba(0,0,0,0.06); cursor:pointer }
+    .contrast-badge{ font-size:12px; padding:4px 6px; border-radius:6px }
+    .image-canvas{ max-width:100%; border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,0.06); }
+    .footer-note{ font-size:12px; color:#6f8795 }
+  </style>
+</head>
+<body>
+  <div class="app-header">
+    <h4 class="mb-0">Círculo Cromático HSL — PRO</h4>
+    <small class="text-white-50">Toasts, Undo, WCAG ampliado, Eyedropper (importar imagem) e exports SCSS/Tailwind/JSON + CMYK</small>
+  </div>
+
+  <div class="container-fluid mt-3">
+    <div class="row">
+      <!-- LEFT PANEL -->
+      <aside class="col-lg-3 col-md-4 left-panel">
+        <div class="mb-3">
+          <label class="form-label text-white">Relações Harmônicas</label>
+          <select id="relationSelect" class="form-select mt-2 bg-dark text-light" aria-label="Relação harmônica">
+            <option value="monochrome">Monocromáticas</option>
+            <option value="complementary">Complementares</option>
+            <option value="analogous">Análogas</option>
+            <option value="triadic">Triádicas</option>
+            <option value="split">Complementares Divididas</option>
+            <option value="tetradic_square">Tetrádicas (Quadrado)</option>
+            <option value="tetradic_rectangle">Tetrádicas (Retângulo)</option>
+            <option value="material">Material</option>
+            <option value="pastel">Pastel</option>
+            <option value="vibrant">Vibrante</option>
+            <option value="high-contrast">Alto Contraste</option>
+            <option value="accessible">Acessível (WCAG)</option>
+          </select>
+        </div>
+
+        <div class="mb-3 bg-white text-dark p-2 rounded">
+          <div>Matiz (H): <strong id="hVal">180</strong>°</div>
+          <div>Saturação (S): <strong id="sVal">70</strong>%</div>
+          <div>Luminosidade (L): <strong id="lVal">50</strong>%</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small-muted">Matiz (Hue)</label>
+          <input type="range" id="hueRange" min="0" max="360" value="180" class="form-range">
+          <label class="form-label small-muted">Saturação</label>
+          <input type="range" id="satRange" min="0" max="100" value="70" class="form-range">
+          <label class="form-label small-muted">Luminosidade</label>
+          <input type="range" id="lumRange" min="0" max="100" value="50" class="form-range">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small-muted">Quantidade de cores</label>
+          <input type="range" id="countRange" min="2" max="8" value="5" class="form-range">
+          <div class="small-muted"> <span id="countVal">5</span> cores</div>
+        </div>
+
+        <div class="d-grid gap-2 mb-2">
+          <button id="undoBtn" class="btn btn-secondary" title="Desfazer (Undo)"><i class="bi bi-arrow-counterclockwise"></i> Undo</button>
+          <button id="randomBtn" class="btn btn-light">🎲 Aleatorizar</button>
+          <button id="resetBtn" class="btn btn-outline-light">↺ Resetar</button>
+        </div>
+
+        <hr style="border-color:rgba(255,255,255,0.06)">
+
+        <div class="mb-3 text-white">
+          <label class="form-label">Importar imagem (Eyedropper)</label>
+          <input id="imageFile" type="file" accept="image/*" class="form-control form-control-sm mb-2">
+          <div class="d-grid gap-2">
+            <button id="togglePick" class="btn btn-sm btn-outline-light">Ativar Eyedropper</button>
+            <button id="clearImage" class="btn btn-sm btn-outline-light">Limpar Imagem</button>
+          </div>
+          <small class="d-block mt-2 small-muted">Importe uma foto para extrair cores clicando sobre a imagem.</small>
+        </div>
+
+        <div class="mt-3 text-white">
+          <label class="form-label">Exportar para desenvolvedor</label>
+          <div class="d-grid gap-2">
+            <button id="exportSCSS" class="btn btn-sm btn-primary">Exportar SCSS</button>
+            <button id="exportTailwind" class="btn btn-sm btn-warning">Exportar Tailwind (config)</button>
+            <button id="exportTokens" class="btn btn-sm btn-outline-light">Exportar Tokens JSON</button>
+          </div>
+          <small class="d-block mt-2 small-muted">Gera snippets prontos para integrar ao projeto.</small>
+        </div>
+      </aside>
+
+      <!-- CENTER -->
+      <main class="col-lg-6 col-md-8">
+        <div class="panel-card mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div><strong>Seleção de Cor</strong><div class="small-muted">Clique/arraste no disco para ajustar Matiz/Saturação</div></div>
+            <div><button id="copyHex" class="btn btn-sm btn-outline-secondary">Copiar HEX</button></div>
+          </div>
+
+          <div class="wheel-wrap position-relative">
+            <canvas id="wheel" width="420" height="420" role="application" aria-label="Círculo cromático"></canvas>
+            <div id="marker" class="marker" style="left:210px; top:210px;"></div>
+          </div>
+
+          <div class="d-flex align-items-center gap-3 mt-3">
+            <div id="currentSwatch" class="swatch" style="border:3px solid #222"></div>
+            <div>
+              <div><strong id="hexLabel">#26d9d9</strong></div>
+              <div class="small-muted" id="hslLabel">hsl(180, 70%, 50%)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>Paleta Gerada</strong>
+            <div class="small-muted">Clique na cor para copiar (HEX) • Sugestões de cor acessível quando necessário</div>
+          </div>
+          <div id="paletteList" class="d-flex gap-2 flex-wrap"></div>
+        </div>
+      </main>
+
+      <!-- RIGHT -->
+      <aside class="col-lg-3">
+        <div class="panel-card mb-3">
+          <strong>Exportar Paleta</strong>
+          <div class="mt-2 d-grid gap-2">
+            <button id="exportCSS" class="btn btn-primary">📋 Variáveis CSS</button>
+            <button id="exportJSON" class="btn btn-outline-primary">📄 Dados JSON</button>
+            <button id="exportPNG" class="btn btn-success">🖼️ Imagem PNG</button>
+            <button id="exportASE" class="btn btn-danger">🔴 Adobe ASE (JSON)</button>
+            <button id="exportCMYK" class="btn btn-outline-dark">🎨 Exportar CMYK (CSV)</button>
+          </div>
+        </div>
+
+        <div class="panel-card mb-3">
+          <strong>Paleta Exportável & Acessibilidade</strong>
+          <div id="generatedPanel" class="mt-2"></div>
+          <div class="footer-note mt-2">Contraste calculado entre a cor base (1ª) e as demais. Clique em "Sugerir cor acessível" para ajustar.</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Hidden image preview area -->
+  <div class="container mt-3">
+    <div class="row">
+      <div class="col-12">
+        <div id="imagePreviewWrap" style="display:none;">
+          <div class="panel-card">
+            <strong>Imagem importada (clique para selecionar cor)</strong>
+            <div class="mt-2">
+              <canvas id="imageCanvas" class="image-canvas"></canvas>
+            </div>
+            <small class="small-muted">Clique sobre a imagem para extrair a cor. Use o botão "Ativar Eyedropper" para alternar seleção.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap Toast container -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080">
+    <div id="toastContainer"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  // =====================
+  // Utilitários HSL/HEX/WCAG
+  // =====================
+  function hslToHex(h, s, l) { s/=100; l/=100; const k = n => (n + h/30) % 12; const a = s * Math.min(l, 1-l); const f = n => l - a * Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n),1))); const toHex = x => Math.round(x*255).toString(16).padStart(2,'0'); return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}` }
+  function hslToRgb(h,s,l){ s/=100; l/=100; const c=(1-Math.abs(2*l-1))*s; const x=c*(1-Math.abs((h/60)%2-1)); const m=l-c/2; let r=0,g=0,b=0; if(h<60){r=c;g=x}else if(h<120){r=x;g=c}else if(h<180){g=c;b=x}else if(h<240){g=x;b=c}else if(h<300){r=x;b=c}else{r=c;b=x} return {r:Math.round((r+m)*255), g:Math.round((g+m)*255), b:Math.round((b+m)*255)} }
+  function hexToRgb(hex){ hex=hex.replace('#',''); if(hex.length===3) hex=hex.split('').map(c=>c+c).join(''); const n=parseInt(hex,16); return {r:(n>>16)&255, g:(n>>8)&255, b:n&255} }
+  function luminance(r,g,b){ const toLin=c=>{ c/=255; return c<=0.03928? c/12.92 : Math.pow((c+0.055)/1.055,2.4) }; return 0.2126*toLin(r)+0.7152*toLin(g)+0.0722*toLin(b) }
+  function contrastRatio(hexA, hexB){ const a=hexToRgb(hexA), b=hexToRgb(hexB); const L1=luminance(a.r,a.g,a.b), L2=luminance(b.r,b.g,b.b); const bright=Math.max(L1,L2), dark=Math.min(L1,L2); return (bright+0.05)/(dark+0.05) }
+
+  // ---------------------------
+  // CMYK conversion and export
+  // ---------------------------
+  function hexToCmyk(hex){
+    const rgb = hexToRgb(hex);
+    const r = rgb.r / 255;
+    const g = rgb.g / 255;
+    const b = rgb.b / 255;
+    if(rgb.r===0 && rgb.g===0 && rgb.b===0){ return {c:0,m:0,y:0,k:100}; }
+    let c = 1 - r;
+    let m = 1 - g;
+    let y = 1 - b;
+    let k = Math.min(c,m,y);
+    if(k >= 1 - 1e-9){ c=0; m=0; y=0; }
+    else{ c = (c - k) / (1 - k); m = (m - k) / (1 - k); y = (y - k) / (1 - k); }
+    return { c: Math.round(c*100), m: Math.round(m*100), y: Math.round(y*100), k: Math.round(k*100) };
+  }
+
+  function exportCMYK(palette){
+    if(!palette || palette.length===0){ showToast('Paleta vazia — gere a paleta antes de exportar.'); return; }
+    let csv = 'color_hex,c_percent,m_percent,y_percent,k_percent\n';
+    const jsonOut = [];
+    palette.forEach(p=>{ const cmyk = hexToCmyk(p.hex); csv += `${p.hex},${cmyk.c},${cmyk.m},${cmyk.y},${cmyk.k}\n`; jsonOut.push({hex:p.hex,cmyk}) });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); downloadBlob(blob, 'palette-cmyk.csv');
+    const jsonText = JSON.stringify(jsonOut, null, 2);
+    navigator.clipboard.writeText(jsonText).then(()=> showToast('Exportado CMYK (CSV) e JSON copiado para a área de transferência.')).catch(()=> showToast('Exportado CMYK (CSV). Falha ao copiar JSON.'));
+  }
+
+  // =====================
+  // Elementos & state
+  // =====================
+  const wheel = document.getElementById('wheel'); const ctx = wheel.getContext('2d'); const marker = document.getElementById('marker'); const currentSwatch = document.getElementById('currentSwatch'); const hexLabel = document.getElementById('hexLabel'); const hslLabel = document.getElementById('hslLabel'); const hVal = document.getElementById('hVal'); const sVal = document.getElementById('sVal'); const lVal = document.getElementById('lVal'); const hRange = document.getElementById('hueRange'); const sRange = document.getElementById('satRange'); const lRange = document.getElementById('lumRange'); const countRange = document.getElementById('countRange'); const countVal = document.getElementById('countVal'); const paletteList = document.getElementById('paletteList'); const relationSelect = document.getElementById('relationSelect'); const generatedPanel = document.getElementById('generatedPanel');
+  const imageFile = document.getElementById('imageFile'); const imagePreviewWrap = document.getElementById('imagePreviewWrap'); const imageCanvas = document.getElementById('imageCanvas'); const imageCtx = imageCanvas.getContext('2d'); const togglePick = document.getElementById('togglePick'); const clearImage = document.getElementById('clearImage');
+
+  let undoStack = []; const UNDO_LIMIT = 30;
+  let state = { h:180, s:70, l:50, count:5, relation:'monochrome', palette:[] };
+
+  // =====================
+  // draw wheel
+  // =====================
+  function drawWheel(){ const w=wheel.width, h=wheel.height, cx=w/2, cy=h/2, r=Math.min(cx,cy)-2; const img=ctx.createImageData(w,h); for(let y=0;y<h;y++){ for(let x=0;x<w;x++){ const dx=x-cx, dy=y-cy; const dist=Math.sqrt(dx*dx+dy*dy); const idx=(y*w+x)*4; if(dist>r){ img.data[idx+3]=0; continue } let hue=Math.atan2(dy,dx)*180/Math.PI; hue=(hue+360)%360; const sat=Math.min(100, Math.round((dist/r)*100)); const rgb=hslToRgb(hue,sat,50); img.data[idx]=rgb.r; img.data[idx+1]=rgb.g; img.data[idx+2]=rgb.b; img.data[idx+3]=255 } } ctx.putImageData(img,0,0) }
+
+  function clientToHS(clientX, clientY){ const rect = wheel.getBoundingClientRect(); const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2; const dx = clientX - cx, dy = clientY - cy; const r = Math.min(rect.width, rect.height)/2 - 2; const dist = Math.sqrt(dx*dx+dy*dy); let sat = Math.round(Math.max(0, Math.min(100,(dist/r)*100))); let angle = Math.atan2(dy,dx)*180/Math.PI; angle=(angle+360)%360; return {h:Math.round(angle), s:Math.round(sat)} }
+
+  let dragging=false; wheel.addEventListener('pointerdown', e=>{ dragging=true; wheel.setPointerCapture(e.pointerId); handlePointer(e); pushUndo(); }); window.addEventListener('pointermove', e=>{ if(dragging) handlePointer(e) }); window.addEventListener('pointerup', ()=>{ dragging=false });
+  function handlePointer(e){ const {h,s} = clientToHS(e.clientX,e.clientY); state.h=h; state.s=s; syncFromState(); }
+
+  function pushUndo(){ const copy = JSON.parse(JSON.stringify(state)); undoStack.push(copy); if(undoStack.length>UNDO_LIMIT) undoStack.shift(); document.getElementById('undoBtn').disabled = false }
+  document.getElementById('undoBtn').addEventListener('click', ()=>{ if(undoStack.length===0) return; const prev = undoStack.pop(); state = prev; syncFromState(); showToast('Desfeito'); if(undoStack.length===0) document.getElementById('undoBtn').disabled = true });
+
+  // =====================
+  // palette generation
+  // =====================
+  function generatePalette(h,s,l,relation,count){ const arr=[]; if(relation==='monochrome'){ const start=Math.max(6,l-30); const step=((Math.min(94,l+30)-start)/(Math.max(1,count-1))); for(let i=0;i<count;i++){ const L=Math.round(start+i*step); arr.push({h,s,l:L,hex:hslToHex(h,s,L)}) } }
+  else if(relation==='complementary'){ const h2=(h+180)%360; for(let i=0;i<count;i++){ const hue = i%2===0? h: h2; arr.push({h:hue,s:Math.max(10,s),l:Math.max(6,Math.min(92,l)),hex:hslToHex(hue,Math.max(0,Math.min(100,s)),Math.max(0,Math.min(100,l)))}) } }
+  else if(relation==='analogous'){ const span=24; const start=h - span*(count-1)/2; for(let i=0;i<count;i++){ const hue=(start+i*span+360)%360; const L=Math.max(6,Math.min(92,l+(i-(count-1)/2)*4)); arr.push({h:hue,s:s,l:L,hex:hslToHex(hue,s,L)}) } }
+  else if(relation==='triadic'){ const shifts=[0,120,240]; for(let i=0;i<count;i++){ const hue=(h+shifts[i%3])%360; const L=Math.max(6,Math.min(92,l+Math.floor(i/3)*6)); arr.push({h:hue,s:s,l:L,hex:hslToHex(hue,s,L)}) } }
+  else if(relation==='split'){ const shifts=[0,150,210]; for(let i=0;i<count;i++){ const hue=(h+shifts[i%3])%360; arr.push({h:hue,s:Math.max(8,s-(i%3)*6),l:Math.min(92,l+(i%3)*6),hex:hslToHex(hue,Math.max(0,s-(i%3)*6),Math.max(0,Math.min(100,l+(i%3)*6)))}) } }
+  else if(relation==='tetradic_square'){ const shifts=[0,90,180,270]; for(let i=0;i<count;i++){ const hue=(h+shifts[i%4])%360; arr.push({h:hue,s:Math.max(8,s-((i%4)-1)*4),l:Math.min(92,l+Math.floor(i/4)*4),hex:hslToHex(hue,Math.max(0,Math.min(100,s-((i%4)-1)*4)),Math.max(0,Math.min(100,l+Math.floor(i/4)*4)))}) } }
+  else if(relation==='tetradic_rectangle'){ const shifts=[0,60,180,240]; for(let i=0;i<count;i++){ const hue=(h+shifts[i%4])%360; arr.push({h:hue,s:Math.max(8,s-((i%4)-1)*3),l:Math.min(92,l+Math.floor(i/4)*5),hex:hslToHex(hue,Math.max(0,Math.min(100,s-((i%4)-1)*3)),Math.max(0,Math.min(100,l+Math.floor(i/4)*5)))}) } }
+  else if(relation==='material'){ const lightness=[95,85,70,55,40,30,15]; for(let i=0;i<count;i++){ const L=lightness[i]!==undefined? lightness[i]: Math.max(8,95-i*12); const S=Math.max(20,s-i*4); arr.push({h:(h+i*6)%360,s:S,l:L,hex:hslToHex((h+i*6)%360,S,L)}) } }
+  else if(relation==='pastel'){ for(let i=0;i<count;i++){ const hue=(h+(i-Math.floor(count/2))*12+360)%360; arr.push({h:hue,s:Math.max(10,s-50),l:Math.min(96,l+22+i*4),hex:hslToHex(hue,Math.max(0,s-50),Math.min(100,l+22+i*4))}) } }
+  else if(relation==='vibrant'){ for(let i=0;i<count;i++){ const hue=(h+(i-(count-1)/2)*24+360)%360; arr.push({h:hue,s:Math.min(100,s+18),l:Math.max(18,Math.min(82,l+(i-(count-1)/2)*3)),hex:hslToHex(hue,Math.min(100,s+18),Math.max(0,Math.min(100,l+(i-(count-1)/2)*3)))}) } }
+  else if(relation==='high-contrast'){ for(let i=0;i<count;i++){ const hue=(h+i*(360/count))%360; const L=i%2===0?12:88; const S=Math.min(100,s+12); arr.push({h:hue,s:S,l:L,hex:hslToHex(hue,S,L)}) } }
+  else if(relation==='accessible'){ arr.push({h:s.h,s:s,l:l,hex:hslToHex(h,s,l)}); for(let i=1;i<count;i++){ const hue=(h+i*(360/(count-1)))%360; const L=(i%2===0)? Math.max(0,l-48): Math.min(100,l+48); arr.push({h:hue,s:Math.min(100,Math.max(20,s)),l:L,hex:hslToHex(hue,Math.min(100,Math.max(20,s)),L)}) } }
+  return arr.slice(0,count) }
+
+  // =====================
+  // rendering
+  // =====================
+  function renderPalette(palette){ paletteList.innerHTML=''; palette.forEach((c,idx)=>{ const el=document.createElement('div'); el.style.cursor='pointer'; el.style.minWidth='140px'; el.style.maxWidth='220px'; el.style.padding='8px'; el.innerHTML=`<div style="display:flex;gap:10px;align-items:center"><div class="swatch" style="background:${c.hex}" title="Clique para copiar ${c.hex}"></div><div style="font-size:13px"><div><strong>${c.hex}</strong></div><div style="color:#6c757d">hsl(${c.h}, ${c.s}%, ${c.l}%)</div><div id="contrast-${idx}" style="margin-top:6px"></div></div></div>`; el.addEventListener('click', ()=>{ navigator.clipboard.writeText(c.hex); showToast(`Copiado ${c.hex}`); }); paletteList.appendChild(el) }) }
+
+  function renderGeneratedPanel(palette){ generatedPanel.innerHTML=''; if(!palette||palette.length===0) return; const base = palette[0].hex; palette.forEach((c,i)=>{ const item=document.createElement('div'); item.className='color-row'; const contrast=contrastRatio(base,c.hex).toFixed(2); const passAA=contrast>=4.5; const passAAA=contrast>=7.0; const suggestion = (!passAA) ? suggestAccessible(base, c.hex, 4.5) : null; item.innerHTML=`<div class="color-swatch" style="background:${c.hex}"></div><div style="flex:1"><div><strong>${c.hex}</strong> <small class="text-muted">hsl(${c.h}, ${c.s}%, ${c.l}%)</small></div><div style="margin-top:6px"><span class="contrast-badge" style="background:${passAA? '#dff0d8' : '#fde2e2'}; color:${passAA? '#2b7a2b' : '#8a1f1f'}">Contraste: ${contrast}</span> <small class="text-muted" style="margin-left:8px">${ passAA? 'AA' : 'falha AA' } ${ passAAA? '/ AAA' : '' }</small></div>${ suggestion ? `<div style="margin-top:6px"><button class="btn btn-sm btn-outline-primary" onclick='applySuggestion("${suggestion.hex}", ${i})'>Sugerir cor acessível (${suggestion.hex})</button></div>` : '' }</div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText('${c.hex}')">Copiar</button><button class="btn btn-sm btn-outline-info" onclick='downloadSwatch("${c.hex}")'>PNG</button></div>`; generatedPanel.appendChild(item) }) }
+
+  function applySuggestion(hexNew, idx){ pushUndo(); if(state.palette[idx]){ state.palette[idx].hex = hexNew; const rgb = hexToRgb(hexNew); const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b); state.palette[idx].h = hsl.h; state.palette[idx].s = hsl.s; state.palette[idx].l = hsl.l; renderPalette(state.palette); renderGeneratedPanel(state.palette); showToast('Aplicada sugestão acessível: '+hexNew); } }
+
+  function rgbToHsl(r,g,b){ r/=255; g/=255; b/=255; const max=Math.max(r,g,b), min=Math.min(r,g,b); let h=0,s=0,l=(max+min)/2; if(max!==min){ const d=max-min; s = l>0.5? d/(2-max-min) : d/(max+min); switch(max){ case r: h=(g-b)/d + (g<b?6:0); break; case g: h=(b-r)/d + 2; break; case b: h=(r-g)/d + 4; break; } h*=60; } return {h:Math.round(h), s:Math.round(s*100), l:Math.round(l*100)} }
+
+  // =====================
+  // exports / helpers
+  // =====================
+  function exportCSSVars(palette){ let css=':root {\n'; palette.forEach((p,i)=> css += `  --color-${i+1}: ${p.hex}; /* hsl(${p.h}, ${p.s}%, ${p.l}%) */\n`); css += '}'; navigator.clipboard.writeText(css); showToast('Variáveis CSS copiadas'); }
+  function exportJSON(palette){ const data = palette.map(p=>({hex:p.hex,h:p.h,s:p.s,l:p.l})); const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); downloadBlob(blob,'palette.json'); }
+  function exportPNG(palette){ const w=800,h=160; const c=document.createElement('canvas'); c.width=w; c.height=h; const ct=c.getContext('2d'); const per=w/palette.length; palette.forEach((p,i)=>{ ct.fillStyle=p.hex; ct.fillRect(i*per,0,per,h); ct.fillStyle='#000'; ct.font='14px Arial'; ct.fillText(`${p.hex}`, i*per+8, h-12); }); c.toBlob(b=>downloadBlob(b,'palette.png')); }
+  function exportASELike(palette){ const aseLike={name:'palette',colors:palette.map(p=>({name:p.hex,hex:p.hex,hsl:[p.h,p.s,p.l]}))}; const blob=new Blob([JSON.stringify(aseLike,null,2)],{type:'application/json'}); downloadBlob(blob,'palette-ase.json'); }
+  function exportSCSS(palette){ let scss='// Paleta SCSS gerada\n'; palette.forEach((p,i)=> scss += `$color-${i+1}: ${p.hex}; // hsl(${p.h}, ${p.s}%, ${p.l}%)\n`); navigator.clipboard.writeText(scss); showToast('SCSS copiado'); }
+  function exportTailwind(palette){ const obj={}; palette.forEach((p,i)=> obj[`c${i+1}`]=p.hex ); const snippet = `module.exports = { theme: { extend: { colors: ${JSON.stringify(obj,null,2)} } } }`; navigator.clipboard.writeText(snippet); showToast('Snippet Tailwind copiado'); }
+  function exportTokens(palette){ const tokens = { name: 'palette', tokens: palette.map((p,i)=>({id:`color.${i+1}`, value:p.hex, comment:`hsl(${p.h}, ${p.s}%, ${p.l}%)`})) }; const blob=new Blob([JSON.stringify(tokens,null,2)],{type:'application/json'}); downloadBlob(blob,'tokens.json'); }
+
+  function downloadBlob(blob,name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+  function downloadSwatch(hex){ const c=document.createElement('canvas'); c.width=240; c.height=160; const ct=c.getContext('2d'); ct.fillStyle=hex; ct.fillRect(0,0,c.width,c.height); ct.fillStyle='#000'; ct.font='14px Arial'; ct.fillText(hex,10,c.height-10); c.toBlob(b=>downloadBlob(b,`${hex.replace('#','')}.png`)); }
+
+  // suggestAccessible defined earlier in other versions; implement small version here
+  function suggestAccessible(hexBase, hexTarget, minRatio=4.5){ function rgbToHslLocal(r,g,b){ r/=255; g/=255; b/=255; const max=Math.max(r,g,b), min=Math.min(r,g,b); let h=0,s=0,l=(max+min)/2; if(max!==min){ const d=max-min; s = l>0.5? d/(2-max-min) : d/(max+min); switch(max){ case r: h=(g-b)/d + (g<b?6:0); break; case g: h=(b-r)/d + 2; break; case b: h=(r-g)/d + 4; break; } h*=60; } return {h:Math.round(h), s:Math.round(s*100), l:Math.round(l*100)} }
+    const rgbT = hexToRgb(hexTarget); const hsl = rgbToHslLocal(rgbT.r, rgbT.g, rgbT.b);
+    for(let step=1; step<=50; step++){ let up = Math.min(98, hsl.l + step); let down = Math.max(2, hsl.l - step); const upHex = hslToHex(hsl.h, hsl.s, up); const downHex = hslToHex(hsl.h, hsl.s, down); if(contrastRatio(hexBase, upHex) >= minRatio) return {hex:upHex, l:up}; if(contrastRatio(hexBase, downHex) >= minRatio) return {hex:downHex, l:down}; }
+    return null; }
+
+  // =====================
+  // image import & eyedropper
+  // =====================
+  let imageLoaded=false; let picking=false;
+  imageFile.addEventListener('change', ev=>{ const f=ev.target.files[0]; if(!f) return; const reader=new FileReader(); reader.onload=e=>{ const img=new Image(); img.onload=()=>{ imageCanvas.width=img.width; imageCanvas.height=img.height; imageCtx.drawImage(img,0,0); imagePreviewWrap.style.display='block'; imageLoaded=true; showToast('Imagem carregada. Clique para selecionar cor.'); }; img.src=e.target.result; }; reader.readAsDataURL(f); });
+  togglePick.addEventListener('click', ()=>{ if(!imageLoaded){ showToast('Carregue uma imagem primeiro'); return } picking=!picking; togglePick.innerText = picking? 'Desativar Eyedropper' : 'Ativar Eyedropper'; imageCanvas.style.cursor = picking? 'crosshair' : 'default'; });
+  clearImage.addEventListener('click', ()=>{ imageCtx.clearRect(0,0,imageCanvas.width,imageCanvas.height); imagePreviewWrap.style.display='none'; imageFile.value=''; imageLoaded=false; picking=false; togglePick.innerText='Ativar Eyedropper'; showToast('Imagem limpa'); });
+  imageCanvas.addEventListener('click', e=>{ if(!picking) return; const rect=imageCanvas.getBoundingClientRect(); const x=Math.floor((e.clientX-rect.left)*(imageCanvas.width/rect.width)); const y=Math.floor((e.clientY-rect.top)*(imageCanvas.height/rect.height)); const data=imageCtx.getImageData(x,y,1,1).data; const rgb={r:data[0],g:data[1],b:data[2]}; const hsl=rgbToHsl(rgb.r,rgb.g,rgb.b); pushUndo(); state.h=hsl.h; state.s=hsl.s; state.l=hsl.l; syncFromState(); showToast(`Cor selecionada: #${((1<<24)+(rgb.r<<16)+(rgb.g<<8)+rgb.b).toString(16).slice(1)}`); });
+
+  // =====================
+  // undo / controls
+  // =====================
+  function pushUndo(){ const copy=JSON.parse(JSON.stringify(state)); undoStack.push(copy); if(undoStack.length>UNDO_LIMIT) undoStack.shift(); document.getElementById('undoBtn').disabled=false }
+  hRange.addEventListener('input', ()=>{ pushUndo(); state.h = parseInt(hRange.value); syncFromState(); });
+  sRange.addEventListener('input', ()=>{ pushUndo(); state.s = parseInt(sRange.value); syncFromState(); });
+  lRange.addEventListener('input', ()=>{ pushUndo(); state.l = parseInt(lRange.value); syncFromState(); });
+  countRange.addEventListener('input', ()=>{ pushUndo(); state.count = parseInt(countRange.value); syncFromState(); });
+  relationSelect.addEventListener('change', ()=>{ pushUndo(); state.relation = relationSelect.value; syncFromState(); });
+  document.getElementById('randomBtn').addEventListener('click', ()=>{ pushUndo(); state.h=Math.floor(Math.random()*360); state.s=40+Math.floor(Math.random()*50); state.l=30+Math.floor(Math.random()*40); state.count=3+Math.floor(Math.random()*5); syncFromState(); });
+  document.getElementById('resetBtn').addEventListener('click', ()=>{ pushUndo(); state={h:180,s:70,l:50,count:5,relation:'monochrome',palette:[]}; relationSelect.value='monochrome'; syncFromState(); showToast('Resetado para padrão'); });
+  document.getElementById('undoBtn').addEventListener('click', ()=>{ if(undoStack.length===0) return; const prev=undoStack.pop(); state=prev; syncFromState(); showToast('Desfeito'); if(undoStack.length===0) document.getElementById('undoBtn').disabled=true });
+
+  document.getElementById('copyHex').addEventListener('click', ()=>{ navigator.clipboard.writeText(hexLabel.innerText); showToast('HEX copiado: '+hexLabel.innerText); });
+
+  document.getElementById('exportCSS').addEventListener('click', ()=> exportCSSVars(state.palette));
+  document.getElementById('exportJSON').addEventListener('click', ()=> exportJSON(state.palette));
+  document.getElementById('exportPNG').addEventListener('click', ()=> exportPNG(state.palette));
+  document.getElementById('exportASE').addEventListener('click', ()=> exportASELike(state.palette));
+  document.getElementById('exportCMYK').addEventListener('click', ()=> exportCMYK(state.palette));
+  document.getElementById('exportSCSS').addEventListener('click', ()=> exportSCSS(state.palette));
+  document.getElementById('exportTailwind').addEventListener('click', ()=> exportTailwind(state.palette));
+  document.getElementById('exportTokens').addEventListener('click', ()=> exportTokens(state.palette));
+
+  // =====================
+  // toast helper
+  // =====================
+  function showToast(message, title='Aviso'){ const container=document.getElementById('toastContainer'); const toast=document.createElement('div'); toast.className='toast align-items-center text-bg-dark border-0 show'; toast.setAttribute('role','alert'); toast.setAttribute('aria-live','assertive'); toast.setAttribute('aria-atomic','true'); toast.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button></div>`; container.appendChild(toast); setTimeout(()=>{ toast.classList.remove('show'); toast.style.opacity=0; setTimeout(()=> toast.remove(),350) },2400); }
+
+  // =====================
+  // init & sync
+  // =====================
+  function syncFromState(){ hVal.innerText=state.h; sVal.innerText=state.s; lVal.innerText=state.l; countVal.innerText=state.count; hRange.value=state.h; sRange.value=state.s; lRange.value=state.l; countRange.value=state.count; const wheelRect = wheel.getBoundingClientRect(); const wrapRect = wheel.parentElement.getBoundingClientRect(); const localCx = wheelRect.width/2; const localCy = wheelRect.height/2; const radius = Math.min(localCx,localCy)-6; const angleRad = (state.h*Math.PI/180); const radial = (state.s/100)*radius; const leftPx = (wheelRect.left - wrapRect.left) + localCx + radial*Math.cos(angleRad); const topPx = (wheelRect.top - wrapRect.top) + localCy + radial*Math.sin(angleRad); marker.style.left = `${leftPx}px`; marker.style.top = `${topPx}px`; marker.style.transform='translate(-50%,-50%)'; const hex = hslToHex(state.h,state.s,state.l); currentSwatch.style.background = hex; hexLabel.innerText = hex; hslLabel.innerText = `hsl(${state.h}, ${state.s}%, ${state.l}%)`; state.palette = generatePalette(state.h,state.s,state.l,state.relation,state.count); renderPalette(state.palette); renderGeneratedPanel(state.palette); }
+
+  function init(){ drawWheel(); syncFromState(); window.addEventListener('resize', ()=>{ drawWheel(); syncFromState(); }); document.getElementById('undoBtn').disabled = true; }
+  init();
+  </script>
+</body>
+</html>
