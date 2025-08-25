@@ -1,4 +1,4 @@
-# 🎨 Círculo Cromático HSL — Avançado (PRO) 🌈
+# 🎨 Círculo Cromático HSL — Avançado (PRO)
 
 > Ferramenta web autônoma para criação, inspeção e exportação de paletas de cores baseada em HSL — com recursos avançados: Bootstrap Toasts, Undo simples, checagem WCAG, Eyedropper (importar imagem) e múltiplos formatos de exportação (CSS / JSON / PNG / SCSS / Tailwind / Tokens / ASE-like / CMYK). 🧰
 
